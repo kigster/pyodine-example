@@ -7,6 +7,10 @@ This folder contains working examples of using Pyodide to run Python code in the
 - **python-console.html** - Full-featured Python console with syntax input, error handling
 - **simple-example.html** - Minimal example showing basic Pyodide usage
 
+## Example
+
+![Example](doc/screenshot.png.)
+
 ## How to Use
 
 1. Start the HTTP server:
