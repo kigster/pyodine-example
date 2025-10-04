@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Pyodide Example</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
+</head>
+<body>
+    <h1>Minimal Pyodide Example</h1>
+    <button onclick="runCode()">Run Python Code</button>
+    <pre id="output"></pre>
+
+    <script>
+        let pyodide;
+        
+        async function loadPyodideAndPackages() {
+            pyodide = await loadPyodide();
+            await pyodide.loadPackage('micropip');
+            const micropip = pyodide.pyimport('micropip');
+            await micropip.install('numpy');
+            console.log('Pyodide ready!');
+        }
+        
+        async function runCode() {
+            if (!pyodide) {
+                document.getElementById('output').textContent = 'Loading Pyodide...';
+                await loadPyodideAndPackages();
+            }
+            
+            const code = `
+import numpy as np
+arr = np.array([1, 2, 3, 4, 5])
+print(f"Array: {arr}")
+print(f"Mean: {arr.mean()}")
+print(f"Sum: {arr.sum()}")
+`;
+            
+            let output = [];
+            pyodide.setStdout({ batched: (msg) => output.push(msg) });
+            
+            await pyodide.runPythonAsync(code);
+            
+            document.getElementById('output').textContent = output.join('\n');
+        }
+        
+        loadPyodideAndPackages();
+    </script>
+</body>
+</html>

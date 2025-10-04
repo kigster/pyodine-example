@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Console - Pyodide</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        #output {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 5px;
+            min-height: 200px;
+            margin-bottom: 20px;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        #code-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            color: #888;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        .error {
+            color: #f48771;
+        }
+        .success {
+            color: #89d185;
+        }
+    </style>
+</head>
+<body>
+    <h1>Python Console with Pyodide</h1>
+    <div id="status" class="status">Loading Pyodide...</div>
+
+    <div id="output"># Python Console Ready
+# Try importing packages like numpy, pandas, matplotlib, etc.
+# Example:
+#   import sys
+#   print(sys.version)
+</div>
+
+    <textarea id="code-input" placeholder="Enter Python code here...">import sys
+print(f"Python version: {sys.version}")
+
+# Import numpy (will be auto-installed)
+import numpy as np
+arr = np.array([1, 2, 3, 4, 5])
+print(f"NumPy array: {arr}")
+print(f"Mean: {arr.mean()}")</textarea>
+
+    <button id="run-btn" disabled>Run Code</button>
+    <button id="clear-btn">Clear Output</button>
+
+    <script type="text/javascript">
+        let pyodide;
+        const output = document.getElementById('output');
+        const codeInput = document.getElementById('code-input');
+        const runBtn = document.getElementById('run-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const status = document.getElementById('status');
+
+        // Initialize Pyodide
+        async function initPyodide() {
+            try {
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/"
+                });
+
+                // Load micropip for package installation
+                await pyodide.loadPackage('micropip');
+
+                status.textContent = 'Pyodide loaded successfully!';
+                status.className = 'status success';
+                runBtn.disabled = false;
+
+                addOutput('>>> Pyodide ready! You can now run Python code.\n', 'success');
+            } catch (error) {
+                status.textContent = 'Failed to load Pyodide';
+                status.className = 'status error';
+                addOutput(`Error loading Pyodide: ${error.message}\n`, 'error');
+            }
+        }
+
+        // Add output to the console
+        function addOutput(text, type = 'normal') {
+            const span = document.createElement('span');
+            if (type === 'error') {
+                span.className = 'error';
+            } else if (type === 'success') {
+                span.className = 'success';
+            }
+            span.textContent = text;
+            output.appendChild(span);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Run Python code
+        async function runPython() {
+            const code = codeInput.value.trim();
+            if (!code) return;
+
+            addOutput(`\n>>> Running code...\n`);
+            runBtn.disabled = true;
+
+            // Collect stdout and stderr
+            let stdoutBuffer = [];
+            let stderrBuffer = [];
+
+            try {
+                // Set up stdout/stderr capture using Pyodide's API
+                pyodide.setStdout({ batched: (msg) => stdoutBuffer.push(msg) });
+                pyodide.setStderr({ batched: (msg) => stderrBuffer.push(msg) });
+
+                // Load micropip and use it to run code with auto-install
+                await pyodide.loadPackage('micropip');
+                const micropip = pyodide.pyimport('micropip');
+
+                // Use micropip to handle imports automatically
+                await micropip.install('numpy');  // Pre-load common packages
+
+                // Run the user's code
+                const result = await pyodide.runPythonAsync(code);
+
+                // Display stdout
+                if (stdoutBuffer.length > 0) {
+                    addOutput(stdoutBuffer.join('\n') + '\n');
+                }
+
+                // Display result if it's not None/undefined
+                if (result !== undefined && result !== null && result !== pyodide.globals.get('None')) {
+                    addOutput(`${result}\n`);
+                }
+
+                // Display stderr as errors
+                if (stderrBuffer.length > 0) {
+                    addOutput(stderrBuffer.join('\n') + '\n', 'error');
+                }
+
+                addOutput('>>> Execution complete.\n', 'success');
+
+            } catch (error) {
+                // Display any stderr that was captured before the error
+                if (stderrBuffer.length > 0) {
+                    addOutput(stderrBuffer.join('\n') + '\n', 'error');
+                }
+                addOutput(`Error: ${error.message}\n`, 'error');
+            } finally {
+                runBtn.disabled = false;
+                // Reset stdout/stderr to default
+                pyodide.setStdout({ batched: () => {} });
+                pyodide.setStderr({ batched: () => {} });
+            }
+        }
+
+        // Clear output
+        function clearOutput() {
+            output.textContent = '# Python Console Ready\n';
+        }
+
+        // Event listeners
+        runBtn.addEventListener('click', runPython);
+        clearBtn.addEventListener('click', clearOutput);
+
+        // Allow Ctrl+Enter to run code
+        codeInput.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                runPython();
+            }
+        });
+
+        // Initialize on page load
+        initPyodide();
+    </script>
+</body>
+</html>
