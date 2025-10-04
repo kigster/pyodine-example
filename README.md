@@ -9,7 +9,7 @@ This folder contains working examples of using Pyodide to run Python code in the
 
 ## Example
 
-![Example](doc/screenshot.png.)
+![Example](doc/screenshot.png)
 
 ## How to Use
 
